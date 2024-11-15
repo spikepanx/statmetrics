@@ -3,34 +3,39 @@ package statmetrics
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 type Stats struct {
-	Name             string            `json:"name" metricHelp:"Handle instance name"`
-	ClientID         string            `json:"client_id" metricHelp:"Client identifier"`
-	Type             string            `json:"type" metricHelp:"Instance type (producer or consumer)"`
-	Ts               int64             `json:"ts" metricHelp:"librdkafka's internal monotonic clock (microseconds)"`
-	Time             int64             `json:"time" metricHelp:"Wall clock time in seconds since the epoch"`
-	Age              int64             `json:"age" metricHelp:"Time since this client instance was created (microseconds)"`
-	ReplyQ           int64             `json:"replyq" metricHelp:"Number of ops (callbacks, events, etc) waiting in queue for application to serve with rd_kafka_poll()"`
-	MsgCnt           int64             `json:"msg_cnt" metricHelp:"Current number of messages in producer queues"`
-	MsgSize          int64             `json:"msg_size" metricHelp:"Current total size of messages in producer queues"`
-	MsgMax           int64             `json:"msg_max" metricHelp:"Threshold: maximum number of messages allowed on the producer queues"`
-	MsgSizeMax       int64             `json:"msg_size_max" metricHelp:"Threshold: maximum total size of messages allowed on the producer queues"`
-	Tx               int64             `json:"tx" metricHelp:"Total number of requests sent to Kafka brokers"`
-	TxBytes          int64             `json:"tx_bytes" metricHelp:"Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers"`
-	Rx               int64             `json:"rx" metricHelp:"Total number of responses received from Kafka brokers"`
-	RxBytes          int64             `json:"rx_bytes" metricHelp:"Total number of bytes received from Kafka brokers"`
-	TxMsgs           int64             `json:"txmsgs" metricHelp:"Total number of messages transmitted to Kafka brokers"`
-	TxMsgsBytes      int64             `json:"txmsgs_bytes" metricHelp:"Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers"`
-	RxMsgs           int64             `json:"rxmsgs" metricHelp:"Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers"`
-	RxMsgsBytes      int64             `json:"rxmsgs_bytes" metricHelp:"Total number of message bytes (including framing) received from Kafka brokers"`
-	SimpleCnt        int64             `json:"simple_cnt" metricHelp:"Internal tracking of legacy vs new consumer API state"`
-	MetadatacacheCnt int64             `json:"metadata_cache_cnt" metricHelp:"Number of topics in the metadata cache"`
-	Brokers          map[string]Broker `json:"brokers" metricHelp:"Brokers handled by this client instance"`
-	Topics           map[string]Topic  `json:"topics" metricHelp:"Topics handled by this client instance"`
-	Cgrps            map[string]Cgrp   `json:"cgrps" metricHelp:"Consumer groups handled by this client instance"`
-	Eos              Eos               `json:"eos" metricHelp:"EOS / Idempotent producer state and metrics"`
+	Name             string             `json:"name" metricHelp:"Handle instance name"`
+	ClientID         string             `json:"client_id" metricHelp:"Client identifier"`
+	Type             string             `json:"type" metricHelp:"Instance type (producer or consumer)"`
+	Ts               int64              `json:"ts" metricHelp:"librdkafka's internal monotonic clock (microseconds)"`
+	Time             int64              `json:"time" metricHelp:"Wall clock time in seconds since the epoch"`
+	Age              int64              `json:"age" metricHelp:"Time since this client instance was created (microseconds)"`
+	ReplyQ           int64              `json:"replyq" metricHelp:"Number of ops (callbacks, events, etc) waiting in queue for application to serve with rd_kafka_poll()"`
+	MsgCnt           int64              `json:"msg_cnt" metricHelp:"Current number of messages in producer queues"`
+	MsgSize          int64              `json:"msg_size" metricHelp:"Current total size of messages in producer queues"`
+	MsgMax           int64              `json:"msg_max" metricHelp:"Threshold: maximum number of messages allowed on the producer queues"`
+	MsgSizeMax       int64              `json:"msg_size_max" metricHelp:"Threshold: maximum total size of messages allowed on the producer queues"`
+	Tx               int64              `json:"tx" metricHelp:"Total number of requests sent to Kafka brokers"`
+	TxBytes          int64              `json:"tx_bytes" metricHelp:"Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers"`
+	Rx               int64              `json:"rx" metricHelp:"Total number of responses received from Kafka brokers"`
+	RxBytes          int64              `json:"rx_bytes" metricHelp:"Total number of bytes received from Kafka brokers"`
+	TxMsgs           int64              `json:"txmsgs" metricHelp:"Total number of messages transmitted to Kafka brokers"`
+	TxMsgsBytes      int64              `json:"txmsgs_bytes" metricHelp:"Total number of message bytes (including framing, such as per-Message framing and MessageSet/batch framing) transmitted to Kafka brokers"`
+	RxMsgs           int64              `json:"rxmsgs" metricHelp:"Total number of messages consumed, not including ignored messages (due to offset, etc), from Kafka brokers"`
+	RxMsgsBytes      int64              `json:"rxmsgs_bytes" metricHelp:"Total number of message bytes (including framing) received from Kafka brokers"`
+	SimpleCnt        int64              `json:"simple_cnt" metricHelp:"Internal tracking of legacy vs new consumer API state"`
+	MetadatacacheCnt int64              `json:"metadata_cache_cnt" metricHelp:"Number of topics in the metadata cache"`
+	Brokers          map[string]*Broker `json:"brokers" metricHelp:"Brokers handled by this client instance"`
+	Topics           map[string]*Topic  `json:"topics" metricHelp:"Topics handled by this client instance"`
+	Cgrps            map[string]*Cgrp   `json:"cgrps" metricHelp:"Consumer groups handled by this client instance"`
+	Eos              Eos                `json:"eos" metricHelp:"EOS / Idempotent producer state and metrics"`
+}
+
+func (v *Stats) GetLabelValues() []string {
+	return []string{v.Name, v.ClientID, v.Type}
 }
 
 type Broker struct {
@@ -68,6 +73,13 @@ type Broker struct {
 	TopPars        map[string]TopPar `json:"toppars" metricHelp:"Partitions handled by this broker handle"`
 }
 
+func (v *Broker) GetLabelValues(s *Stats) []string {
+	return append(
+		s.GetLabelValues(),
+		v.Name, v.NodeName,
+	)
+}
+
 type WinStats struct {
 	Min        int64 `json:"min"`
 	Max        int64 `json:"max"`
@@ -83,6 +95,17 @@ type WinStats struct {
 	P99        int64 `json:"p99"`
 	P9999      int64 `json:"p99_99"`
 	OutOfRange int64 `json:"outofrange"`
+}
+
+func (v *WinStats) Metrics() {
+	val := reflect.ValueOf(v).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		fName := typ.Field(i).Name
+		tag := typ.Field(i).Tag.Get("json")
+
+	}
 }
 
 type TopPar struct {
